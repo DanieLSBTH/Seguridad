@@ -62,7 +62,7 @@ app.use((err, req, res, next) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(` Servidor corriendo en puerto ${PORT}`);
+  console.log(` El ervidor esta corriendo en puerto ${PORT}`);
   console.log(` Ambiente: ${process.env.NODE_ENV || 'development'}`);
   console.log(` Medidas de seguridad: Helmet, CORS, Rate limiting`);
 });
