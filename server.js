@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 // Middlewares de seguridad
 app.use(helmet()); // Protección de headers HTTP
 app.use(cors({
-  origin: ['http://localhost:3001', 'http://localhost:3000', 'https://tu-frontend-en-render.com'],
+  origin: ['https://prueba-de-seguridad.onrender.com'],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' })); // Limitar tamaño de payload
