@@ -1,10 +1,10 @@
-// auth.js - Rutas de autenticación con seguridad
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { body, validationResult } = require('express-validator');
 const db = require('./db');
 const { authenticateToken, rateLimiter } = require('./middleware');
+const alerts = require('./alerts'); // ← AGREGAR ESTA LÍNEA
 
 const router = express.Router();
 const SALT_ROUNDS = 12;
@@ -61,6 +61,7 @@ router.post('/register', rateLimiter, registerValidation, async (req, res) => {
 
     // Log de seguridad
     console.log(` Nuevo usuario registrado: ${email} - ${new Date().toISOString()}`);
+    await alerts.newUserRegistered(email, req.ip); // ← AGREGAR ESTA LÍNEA
 
     res.status(201).json({
       message: 'Usuario registrado exitosamente',
@@ -97,6 +98,8 @@ router.post('/login', rateLimiter, loginValidation, async (req, res) => {
     if (result.rows.length === 0) {
       // Log de intento fallido
       console.log(` Intento de login fallido: ${email} - Usuario no existe`);
+      await alerts.loginAttemptsFailed(email, req.ip); // ← AGREGAR ESTA LÍNEA
+  
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
@@ -107,6 +110,9 @@ router.post('/login', rateLimiter, loginValidation, async (req, res) => {
 
     if (!validPassword) {
       console.log(` Intento de login fallido: ${email} - Contraseña incorrecta`);
+       // Enviar alerta
+      await alerts.loginAttemptsFailed(email, req.ip); // ← AGREGAR ESTA LÍNEA
+  
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 

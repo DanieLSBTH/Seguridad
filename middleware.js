@@ -1,6 +1,6 @@
 // middleware.js - Middleware de seguridad y autenticación
 const jwt = require('jsonwebtoken');
-
+const alerts = require('./alerts'); // ← AGREGAR AL INICIO
 // Middleware para verificar JWT
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -41,6 +41,7 @@ const rateLimiter = (req, res, next) => {
   
   if (recentRequests.length >= maxRequests) {
     console.log(` Rate limit excedido para IP: ${ip}`);
+    alerts.rateLimitExceeded(ip, req.path); //
     return res.status(429).json({ 
       error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.' 
     });
