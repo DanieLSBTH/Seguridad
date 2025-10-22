@@ -4,9 +4,9 @@ const sgMail = require('@sendgrid/mail');
 // Configurar SendGrid
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('✅ SendGrid API Key configurada');
+  console.log(' SendGrid API Key configurada');
 } else {
-  console.log('⚠️ SendGrid API Key NO encontrada en .env');
+  console.log(' SendGrid API Key NO encontrada en .env');
 }
 
 // Función para obtener el color según la severidad
@@ -34,21 +34,21 @@ function getAlertIcon(type) {
 async function sendAlert(type, details) {
   // Verificar configuración
   if (!process.env.SENDGRID_API_KEY) {
-    console.log('⚠️ SENDGRID_API_KEY no configurada');
+    console.log(' SENDGRID_API_KEY no configurada');
     return;
   }
   
   if (!process.env.ALERT_EMAIL) {
-    console.log('⚠️ ALERT_EMAIL no configurada');
+    console.log(' ALERT_EMAIL no configurada');
     return;
   }
 
   if (!process.env.ALERT_FROM_EMAIL) {
-    console.log('⚠️ ALERT_FROM_EMAIL no configurada');
+    console.log(' ALERT_FROM_EMAIL no configurada');
     return;
   }
 
-  console.log('📧 Intentando enviar email...');
+  console.log(' Intentando enviar email...');
   console.log('  To:', process.env.ALERT_EMAIL);
   console.log('  From:', process.env.ALERT_FROM_EMAIL);
   console.log('  Type:', type);
@@ -71,13 +71,13 @@ async function sendAlert(type, details) {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ${alertIcon} TIPO: ${type}
-🎯 SEVERIDAD: ${details.severity}
-📅 FECHA: ${timestamp}
-🌐 IP: ${details.ip || 'Desconocida'}
-${details.email ? `📧 EMAIL: ${details.email}` : ''}
-${details.endpoint ? `🔗 ENDPOINT: ${details.endpoint}` : ''}
-${details.userId ? `👤 USER ID: ${details.userId}` : ''}
-${details.resource ? `📁 RECURSO: ${details.resource}` : ''}
+ SEVERIDAD: ${details.severity}
+ FECHA: ${timestamp}
+ IP: ${details.ip || 'Desconocida'}
+${details.email ? ` EMAIL: ${details.email}` : ''}
+${details.endpoint ? ` ENDPOINT: ${details.endpoint}` : ''}
+${details.userId ? ` USER ID: ${details.userId}` : ''}
+${details.resource ? ` RECURSO: ${details.resource}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ACCIÓN REQUERIDA
@@ -270,7 +270,7 @@ Universidad Mariano Gálvez de Guatemala
       <div class="info-section">
         <div class="section-label">Detalles del evento</div>
         <div class="info-item">
-          <div class="info-key">Fecha</div>
+          <div class="info-key">Fecha </div>
           <div class="info-value">${timestamp}</div>
         </div>
         <div class="info-item">
@@ -279,7 +279,7 @@ Universidad Mariano Gálvez de Guatemala
         </div>
         ${details.email ? `
         <div class="info-item">
-          <div class="info-key">Email</div>
+          <div class="info-key">Email </div>
           <div class="info-value">${details.email}</div>
         </div>
         ` : ''}
@@ -345,9 +345,9 @@ Universidad Mariano Gálvez de Guatemala
 
   try {
     await sgMail.send(msg);
-    console.log(`✅ Alerta enviada exitosamente: ${type}`);
+    console.log(` Alerta enviada exitosamente: ${type}`);
   } catch (error) {
-    console.error('❌ Error enviando alerta:', error.message);
+    console.error(' Error enviando alerta:', error.message);
     if (error.response) {
       console.error('Código:', error.response.statusCode);
       console.error('Body:', error.response.body);
