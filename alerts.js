@@ -12,23 +12,23 @@ if (process.env.SENDGRID_API_KEY) {
 // Función para obtener el color según la severidad
 function getSeverityColor(severity) {
   const colors = {
-    'CRÍTICA': '#dc3545',
-    'ALTA': '#fd7e14',
-    'MEDIA': '#ffc107',
-    'BAJA': '#0dcaf0',
-    'INFO': '#0d6efd'
+    'CRÍTICA': '#d13438',
+    'ALTA': '#ea4300',
+    'MEDIA': '#ffb900',
+    'BAJA': '#00b7c3',
+    'INFO': '#0078d4'
   };
-  return colors[severity] || '#6c757d';
+  return colors[severity] || '#605e5c';
 }
 
 // Función para obtener el icono según el tipo de alerta
 function getAlertIcon(type) {
-  if (type.includes('Login')) return '🔐';
-  if (type.includes('SQL')) return '💉';
-  if (type.includes('Rate Limit')) return '⏱️';
-  if (type.includes('Acceso')) return '🚫';
-  if (type.includes('Usuario')) return '👤';
-  return '🚨';
+  if (type.includes('Login')) return '⚠';
+  if (type.includes('SQL')) return '⚠';
+  if (type.includes('Rate Limit')) return '⚠';
+  if (type.includes('Acceso')) return '⚠';
+  if (type.includes('Usuario')) return 'ℹ';
+  return '⚠';
 }
 
 async function sendAlert(type, details) {
@@ -64,7 +64,7 @@ async function sendAlert(type, details) {
   const msg = {
     to: process.env.ALERT_EMAIL,
     from: process.env.ALERT_FROM_EMAIL,
-    subject: `${alertIcon} [${details.severity}] ${type}`,
+    subject: `[${details.severity}] ${type}`,
     text: `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ALERTA DE SEGURIDAD
@@ -104,159 +104,154 @@ Universidad Mariano Gálvez de Guatemala
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.6; 
-      background: #f4f6f9;
-      padding: 20px;
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f3f2f1;
+      -webkit-font-smoothing: antialiased;
     }
     .email-wrapper {
-      max-width: 650px;
-      margin: 0 auto;
-      background: #ffffff;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
     }
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 40px 30px;
-      text-align: center;
+      padding: 32px 40px 24px 40px;
+      border-bottom: 1px solid #edebe9;
     }
-    .header h1 {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 10px;
-      text-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    }
-    .header .subtitle {
-      font-size: 14px;
-      opacity: 0.95;
-      font-weight: 300;
-    }
-    .alert-badge {
+    .severity-label {
       display: inline-block;
-      background: ${severityColor};
-      color: white;
-      padding: 12px 24px;
-      border-radius: 25px;
-      font-weight: 700;
-      font-size: 14px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin: 30px auto;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    .content {
-      padding: 40px 30px;
-    }
-    .alert-title {
-      font-size: 24px;
-      color: #2c3e50;
-      margin-bottom: 25px;
-      padding-bottom: 15px;
-      border-bottom: 3px solid ${severityColor};
-      font-weight: 600;
-    }
-    .info-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-bottom: 30px;
-    }
-    .info-card {
-      background: #f8f9fa;
-      padding: 20px;
-      border-radius: 8px;
-      border-left: 4px solid ${severityColor};
-      transition: transform 0.2s;
-    }
-    .info-card:hover {
-      transform: translateX(5px);
-    }
-    .info-label {
-      font-size: 12px;
-      color: #6c757d;
-      text-transform: uppercase;
-      font-weight: 600;
-      letter-spacing: 0.5px;
-      margin-bottom: 5px;
-    }
-    .info-value {
-      font-size: 16px;
-      color: #2c3e50;
-      font-weight: 500;
-      word-break: break-all;
-    }
-    .action-box {
-      background: linear-gradient(135deg, #fff5e6 0%, #ffe9cc 100%);
-      border: 2px solid #ff9800;
-      border-radius: 8px;
-      padding: 25px;
-      margin: 30px 0;
-    }
-    .action-box h3 {
-      color: #e65100;
-      font-size: 18px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .action-box p {
-      color: #5d4037;
-      font-size: 15px;
-      line-height: 1.6;
-    }
-    .details-section {
-      background: #f8f9fa;
-      border-radius: 8px;
-      padding: 20px;
-      margin: 20px 0;
-    }
-    .details-section h3 {
-      color: #495057;
-      font-size: 16px;
-      margin-bottom: 15px;
-      font-weight: 600;
-    }
-    .details-code {
-      background: #2d3748;
-      color: #e2e8f0;
-      padding: 20px;
-      border-radius: 6px;
-      font-family: 'Courier New', monospace;
+      color: ${severityColor};
       font-size: 13px;
-      overflow-x: auto;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+    .title {
+      font-size: 24px;
+      font-weight: 600;
+      color: #201f1e;
+      margin: 0 0 8px 0;
+      line-height: 1.3;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #605e5c;
+      margin: 0;
       line-height: 1.5;
     }
+    .content {
+      padding: 32px 40px;
+    }
+    .info-section {
+      margin-bottom: 32px;
+    }
+    .section-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #323130;
+      margin-bottom: 12px;
+    }
+    .info-item {
+      display: flex;
+      padding: 10px 0;
+      border-bottom: 1px solid #f3f2f1;
+    }
+    .info-item:last-child {
+      border-bottom: none;
+    }
+    .info-key {
+      flex: 0 0 140px;
+      font-size: 14px;
+      color: #605e5c;
+    }
+    .info-value {
+      flex: 1;
+      font-size: 14px;
+      color: #201f1e;
+      word-break: break-word;
+    }
+    .alert-box {
+      background-color: #fef6f6;
+      border-left: 4px solid ${severityColor};
+      padding: 16px 20px;
+      margin: 24px 0;
+    }
+    .alert-box-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #323130;
+      margin: 0 0 8px 0;
+    }
+    .alert-box-text {
+      font-size: 14px;
+      color: #323130;
+      margin: 0;
+      line-height: 1.6;
+    }
+    .button {
+      display: inline-block;
+      background-color: ${severityColor};
+      color: #ffffff;
+      text-decoration: none;
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 2px;
+      margin: 8px 0 24px 0;
+    }
+    .technical-section {
+      background-color: #faf9f8;
+      padding: 16px 20px;
+      margin-top: 24px;
+      border-radius: 2px;
+    }
+    .technical-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #323130;
+      margin: 0 0 12px 0;
+    }
+    .technical-content {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      color: #323130;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+      line-height: 1.6;
+    }
     .footer {
-      background: #2c3e50;
-      color: #ecf0f1;
-      padding: 30px;
+      padding: 24px 40px 32px 40px;
+      border-top: 1px solid #edebe9;
       text-align: center;
     }
-    .footer h4 {
-      color: #3498db;
-      font-size: 16px;
-      margin-bottom: 10px;
+    .footer-text {
+      font-size: 12px;
+      color: #605e5c;
+      line-height: 1.6;
+      margin: 0;
     }
-    .footer p {
-      font-size: 13px;
-      opacity: 0.9;
-      margin: 5px 0;
-    }
-    .footer-logo {
-      font-size: 32px;
-      margin-bottom: 10px;
+    .footer-link {
+      color: #0078d4;
+      text-decoration: none;
     }
     @media only screen and (max-width: 600px) {
-      .email-wrapper { border-radius: 0; }
-      .header { padding: 30px 20px; }
-      .content { padding: 25px 20px; }
-      .info-grid { grid-template-columns: 1fr; }
+      .email-wrapper {
+        margin: 0;
+      }
+      .header, .content, .footer {
+        padding-left: 24px;
+        padding-right: 24px;
+      }
+      .info-item {
+        flex-direction: column;
+      }
+      .info-key {
+        margin-bottom: 4px;
+      }
     }
   </style>
 </head>
@@ -264,86 +259,82 @@ Universidad Mariano Gálvez de Guatemala
   <div class="email-wrapper">
     <!-- Header -->
     <div class="header">
-      <h1>${alertIcon} ALERTA DE SEGURIDAD</h1>
-      <p class="subtitle">Sistema de Monitoreo y Detección de Amenazas</p>
-      <div class="alert-badge">${details.severity}</div>
+      <div class="severity-label">${details.severity}</div>
+      <h1 class="title">${type}</h1>
+      <p class="subtitle">Detectamos una actividad inusual en el sistema de seguridad</p>
     </div>
 
     <!-- Content -->
     <div class="content">
-      <div class="alert-title">
-        ${alertIcon} ${type}
-      </div>
-
-      <!-- Info Grid -->
-      <div class="info-grid">
-        <div class="info-card">
-          <div class="info-label">📅 Fecha y Hora</div>
+      <!-- Alert Information -->
+      <div class="info-section">
+        <div class="section-label">Detalles del evento</div>
+        <div class="info-item">
+          <div class="info-key">Fecha</div>
           <div class="info-value">${timestamp}</div>
         </div>
-        
-        <div class="info-card">
-          <div class="info-label">🌐 Dirección IP</div>
+        <div class="info-item">
+          <div class="info-key">Dirección IP</div>
           <div class="info-value">${details.ip || 'No disponible'}</div>
         </div>
-        
         ${details.email ? `
-        <div class="info-card">
-          <div class="info-label">📧 Email</div>
+        <div class="info-item">
+          <div class="info-key">Email</div>
           <div class="info-value">${details.email}</div>
         </div>
         ` : ''}
-        
         ${details.endpoint ? `
-        <div class="info-card">
-          <div class="info-label">🔗 Endpoint</div>
+        <div class="info-item">
+          <div class="info-key">Endpoint</div>
           <div class="info-value">${details.endpoint}</div>
         </div>
         ` : ''}
-        
         ${details.userId ? `
-        <div class="info-card">
-          <div class="info-label">👤 ID de Usuario</div>
+        <div class="info-item">
+          <div class="info-key">ID de Usuario</div>
           <div class="info-value">${details.userId}</div>
         </div>
         ` : ''}
-        
         ${details.resource ? `
-        <div class="info-card">
-          <div class="info-label">📁 Recurso</div>
+        <div class="info-item">
+          <div class="info-key">Recurso</div>
           <div class="info-value">${details.resource}</div>
         </div>
         ` : ''}
-        
         ${details.attempts ? `
-        <div class="info-card">
-          <div class="info-label">🔄 Intentos</div>
+        <div class="info-item">
+          <div class="info-key">Intentos</div>
           <div class="info-value">${details.attempts}</div>
+        </div>
+        ` : ''}
+        ${details.payload ? `
+        <div class="info-item">
+          <div class="info-key">Payload detectado</div>
+          <div class="info-value">${details.payload}</div>
         </div>
         ` : ''}
       </div>
 
-      <!-- Action Box -->
-      <div class="action-box">
-        <h3>⚠️ Acción Requerida</h3>
-        <p>${details.action}</p>
+      <!-- Action Required -->
+      <div class="alert-box">
+        <p class="alert-box-title">Acción requerida</p>
+        <p class="alert-box-text">${details.action}</p>
       </div>
 
-      <!-- Details Section -->
-      <div class="details-section">
-        <h3>🔍 Información Técnica Detallada</h3>
-        <div class="details-code">${JSON.stringify(details, null, 2)}</div>
+      <!-- Technical Details -->
+      <div class="technical-section">
+        <p class="technical-title">Información técnica</p>
+        <pre class="technical-content">${JSON.stringify(details, null, 2)}</pre>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="footer">
-      <div class="footer-logo">🛡️</div>
-      <h4>Sistema de Seguridad UMG</h4>
-      <p>Maestría en Seguridad Informática</p>
-      <p>Universidad Mariano Gálvez de Guatemala</p>
-      <p style="margin-top: 15px; font-size: 12px; opacity: 0.7;">
-        Este es un correo automático generado por el sistema de monitoreo de seguridad.
+      <p class="footer-text">
+        <strong>Sistema de Seguridad UMG</strong><br>
+        Maestría en Seguridad Informática<br>
+        Universidad Mariano Gálvez de Guatemala<br><br>
+        Este es un mensaje automático del sistema de monitoreo de seguridad.
       </p>
     </div>
   </div>
