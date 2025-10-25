@@ -81,6 +81,7 @@ router.post('/register', rateLimiter, registerValidation, async (req, res) => {
 
 // LOGIN de usuario
 // LOGIN de usuario (CON MFA)
+// LOGIN de usuario (MODIFICADO CON BACKUP CODES)
 router.post('/login', rateLimiter, loginValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -88,7 +89,7 @@ router.post('/login', rateLimiter, loginValidation, async (req, res) => {
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { email, password, mfaToken } = req.body; // ← Agregar mfaToken
+    const { email, password, mfaToken } = req.body;
 
     // Buscar usuario
     const result = await db.query(
@@ -113,26 +114,60 @@ router.post('/login', rateLimiter, loginValidation, async (req, res) => {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // ✅ NUEVA LÓGICA: Verificar si tiene MFA habilitado
+    // ✅ MFA habilitado
     if (user.mfa_enabled) {
-      // Si tiene MFA pero no envió el código
       if (!mfaToken) {
         return res.status(206).json({ 
           message: 'MFA requerido',
           mfa_required: true,
-          instructions: 'Ingresa el código de 6 dígitos de tu Google Authenticator'
+          instructions: 'Ingresa el código de 6 dígitos de Google Authenticator o un código de backup'
         });
       }
 
-      // Verificar código MFA
-      const mfaValid = mfa.verifyMFAToken(mfaToken, user.mfa_secret);
+      let mfaValid = false;
 
-      if (!mfaValid) {
-        console.log(`⚠️ Código MFA incorrecto: ${email}`);
-        return res.status(401).json({ error: 'Código MFA incorrecto' });
+      // ✨ Intentar primero con código TOTP (6 dígitos)
+      if (mfaToken.length === 6 && /^\d+$/.test(mfaToken)) {
+        mfaValid = mfa.verifyMFAToken(mfaToken, user.mfa_secret);
+        if (mfaValid) {
+          console.log(`✅ Login con MFA (TOTP) exitoso: ${email}`);
+        }
       }
 
-      console.log(`✅ Login con MFA exitoso: ${email}`);
+      // ✨ Si TOTP falló, intentar con código de backup
+      if (!mfaValid && user.mfa_backup_codes && user.mfa_backup_codes.length > 0) {
+        const backupResult = await mfa.verifyBackupCode(mfaToken, user.mfa_backup_codes);
+        
+        if (backupResult.valid) {
+          // ✅ Código de backup válido - actualizarlo (consumir)
+          await db.query(
+            'UPDATE usuarios SET mfa_backup_codes = $1 WHERE id = $2',
+            [backupResult.remainingCodes, user.id]
+          );
+          
+          console.log(`✅ Login con código de backup exitoso: ${email} (${backupResult.remainingCodes.length} códigos restantes)`);
+          
+          // Alerta si quedan pocos códigos
+          if (backupResult.remainingCodes.length <= 2) {
+            await alerts.custom('Códigos de Backup Agotándose', {
+              email: user.email,
+              remaining: backupResult.remainingCodes.length,
+              action: 'El usuario debe regenerar códigos de backup pronto',
+              severity: 'MEDIA'
+            });
+          }
+          
+          mfaValid = true;
+        }
+      }
+
+      if (!mfaValid) {
+        console.log(`⚠️ Código MFA/Backup incorrecto: ${email}`);
+        return res.status(401).json({ 
+          error: 'Código MFA o de backup incorrecto',
+          remaining_backups: user.mfa_backup_codes ? user.mfa_backup_codes.length : 0
+        });
+      }
     }
 
     // Actualizar último login
@@ -158,7 +193,8 @@ router.post('/login', rateLimiter, loginValidation, async (req, res) => {
         email: user.email,
         nombre: user.nombre,
         rol: user.rol,
-        mfa_enabled: user.mfa_enabled // ← Informar si tiene MFA
+        mfa_enabled: user.mfa_enabled,
+        backup_codes_remaining: user.mfa_backup_codes ? user.mfa_backup_codes.length : 0
       }
     });
 
@@ -256,6 +292,7 @@ router.post('/mfa/setup', authenticateToken, async (req, res) => {
 });
 
 // VERIFICAR Y ACTIVAR MFA
+// VERIFICAR Y ACTIVAR MFA (MODIFICADO)
 router.post('/mfa/verify', authenticateToken, async (req, res) => {
   try {
     const { token } = req.body;
@@ -265,7 +302,6 @@ router.post('/mfa/verify', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Código inválido. Debe tener 6 dígitos.' });
     }
 
-    // Obtener secreto
     const result = await db.query(
       'SELECT mfa_secret, mfa_enabled FROM usuarios WHERE id = $1',
       [userId]
@@ -277,7 +313,6 @@ router.post('/mfa/verify', authenticateToken, async (req, res) => {
       });
     }
 
-    // Verificar código
     const isValid = mfa.verifyMFAToken(token, result.rows[0].mfa_secret);
 
     if (!isValid) {
@@ -285,17 +320,22 @@ router.post('/mfa/verify', authenticateToken, async (req, res) => {
       return res.status(401).json({ error: 'Código incorrecto' });
     }
 
-    // HABILITAR MFA
+    // ✨ GENERAR CÓDIGOS DE BACKUP
+    const { plain, hashed } = await mfa.generateBackupCodes(10);
+
+    // HABILITAR MFA y guardar códigos hasheados
     await db.query(
-      'UPDATE usuarios SET mfa_enabled = true WHERE id = $1',
-      [userId]
+      'UPDATE usuarios SET mfa_enabled = true, mfa_backup_codes = $1 WHERE id = $2',
+      [hashed, userId]
     );
 
     console.log(`✅ MFA habilitado para: ${req.user.email}`);
 
     res.json({
       message: '¡MFA activado exitosamente!',
-      mfa_enabled: true
+      mfa_enabled: true,
+      backup_codes: plain, // ← Mostrar SOLO UNA VEZ
+      warning: '⚠️ GUARDA ESTOS CÓDIGOS EN UN LUGAR SEGURO. No podrás verlos de nuevo.'
     });
 
   } catch (error) {
@@ -338,5 +378,73 @@ router.post('/mfa/disable', authenticateToken, async (req, res) => {
   }
 });
 
+// VER CÓDIGOS DE BACKUP RESTANTES
+router.get('/mfa/backup-codes/remaining', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      'SELECT mfa_backup_codes FROM usuarios WHERE id = $1',
+      [req.user.userId]
+    );
+
+    const codes = result.rows[0].mfa_backup_codes || [];
+
+    res.json({
+      remaining: codes.length,
+      warning: codes.length <= 2 ? 'Quedan pocos códigos. Considera regenerarlos.' : null
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo códigos:', error);
+    res.status(500).json({ error: 'Error al obtener información' });
+  }
+});
+
+// REGENERAR CÓDIGOS DE BACKUP (requiere contraseña)
+router.post('/mfa/backup-codes/regenerate', authenticateToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Contraseña requerida' });
+    }
+
+    // Verificar contraseña
+    const result = await db.query(
+      'SELECT password_hash, mfa_enabled FROM usuarios WHERE id = $1',
+      [req.user.userId]
+    );
+
+    if (!result.rows[0].mfa_enabled) {
+      return res.status(400).json({ error: 'MFA no está habilitado' });
+    }
+
+    const validPassword = await bcrypt.compare(password, result.rows[0].password_hash);
+
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+
+    // Generar nuevos códigos
+    const { plain, hashed } = await mfa.generateBackupCodes(10);
+
+    // Actualizar en BD
+    await db.query(
+      'UPDATE usuarios SET mfa_backup_codes = $1 WHERE id = $2',
+      [hashed, req.user.userId]
+    );
+
+    console.log(`🔄 Códigos de backup regenerados para: ${req.user.email}`);
+
+    res.json({
+      message: 'Códigos regenerados exitosamente',
+      backup_codes: plain,
+      warning: '⚠️ Los códigos anteriores ya no funcionan. Guarda estos nuevos códigos.'
+    });
+
+  } catch (error) {
+    console.error('Error regenerando códigos:', error);
+    res.status(500).json({ error: 'Error al regenerar códigos' });
+  }
+});
 
 module.exports = router;
