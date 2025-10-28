@@ -6,6 +6,7 @@ const db = require('./db');
 const { authenticateToken, rateLimiter } = require('./middleware');
 const alerts = require('./alerts'); // ← AGREGAR ESTA LÍNEA
 const mfa = require('./mfa'); // ← Agregar al inicio con los otros requires
+const passwordReset = require('./password-reset');
 const router = express.Router();
 const SALT_ROUNDS = 12;
 
@@ -444,6 +445,321 @@ router.post('/mfa/backup-codes/regenerate', authenticateToken, async (req, res) 
   } catch (error) {
     console.error('Error regenerando códigos:', error);
     res.status(500).json({ error: 'Error al regenerar códigos' });
+  }
+});
+
+// RECUPERACIÓN DE CONTRASEÑA
+// ============================================
+// ============================================
+// RECUPERACIÓN DE CONTRASEÑA
+// ============================================
+
+// SOLICITAR RESET
+router.post('/password/forgot', rateLimiter, async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email requerido' });
+    }
+
+    const result = await db.query(
+      'SELECT id, email, nombre FROM usuarios WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      console.log(`⚠️ Reset solicitado para email no existente: ${email}`);
+      return res.json({ 
+        message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña.' 
+      });
+    }
+
+    const user = result.rows[0];
+
+    const token = passwordReset.generateResetToken();
+    const expires = passwordReset.getResetExpiration();
+
+    await db.query(
+      'UPDATE usuarios SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+      [token, expires, user.id]
+    );
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3001'}/reset-password?token=${token}`;
+    
+    // 🔥 ENVIAR EMAIL DIRECTO AL USUARIO
+    const sgMail = require('@sendgrid/mail');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+    const msg = {
+      to: user.email, // ← EMAIL DEL USUARIO
+      from: process.env.SENDGRID_FROM_EMAIL || 'josuemarque15@gmail.com',
+      subject: '🔐 Recuperación de Contraseña - Sistema UMG',
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body { 
+              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              margin: 0;
+              padding: 0;
+              background-color: #f4f4f4;
+            }
+            .container { 
+              max-width: 600px; 
+              margin: 40px auto; 
+              background: white;
+              border-radius: 10px;
+              overflow: hidden;
+              box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            .header { 
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+              color: white; 
+              padding: 40px 30px; 
+              text-align: center;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 28px;
+              font-weight: 600;
+            }
+            .content { 
+              padding: 40px 30px;
+            }
+            .content p {
+              margin: 15px 0;
+              font-size: 16px;
+            }
+            .button-container {
+              text-align: center;
+              margin: 30px 0;
+            }
+            .button { 
+              display: inline-block; 
+              padding: 15px 40px; 
+              background: #667eea; 
+              color: white !important; 
+              text-decoration: none; 
+              border-radius: 5px; 
+              font-weight: bold;
+              font-size: 16px;
+              transition: background 0.3s ease;
+            }
+            .button:hover {
+              background: #5568d3;
+            }
+            .link-box {
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 5px;
+              border-left: 4px solid #667eea;
+              margin: 20px 0;
+              word-break: break-all;
+              font-size: 14px;
+              color: #666;
+            }
+            .warning { 
+              background: #fff3cd; 
+              border-left: 4px solid #ffc107; 
+              padding: 20px; 
+              margin: 25px 0;
+              border-radius: 5px;
+            }
+            .warning strong {
+              color: #856404;
+              display: block;
+              margin-bottom: 10px;
+              font-size: 16px;
+            }
+            .warning ul {
+              margin: 10px 0;
+              padding-left: 20px;
+            }
+            .warning li {
+              margin: 8px 0;
+              color: #856404;
+            }
+            .footer { 
+              text-align: center; 
+              padding: 30px;
+              background: #f8f9fa;
+              color: #666; 
+              font-size: 14px;
+              border-top: 1px solid #e9ecef;
+            }
+            .footer p {
+              margin: 5px 0;
+            }
+            .logo {
+              font-size: 48px;
+              margin-bottom: 10px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">🔐</div>
+              <h1>Recuperación de Contraseña</h1>
+            </div>
+            
+            <div class="content">
+              <p>Hola <strong>${user.nombre}</strong>,</p>
+              
+              <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en el <strong>Sistema de Seguridad UMG</strong>.</p>
+              
+              <p>Para crear una nueva contraseña, haz clic en el siguiente botón:</p>
+              
+              <div class="button-container">
+                <a href="${resetUrl}" class="button">Restablecer mi Contraseña</a>
+              </div>
+              
+              <p style="text-align: center; color: #666; font-size: 14px;">
+                Si el botón no funciona, copia y pega este enlace en tu navegador:
+              </p>
+              
+              <div class="link-box">
+                ${resetUrl}
+              </div>
+              
+              <div class="warning">
+                <strong>⚠️ Información Importante</strong>
+                <ul>
+                  <li>Este enlace <strong>expira en 1 hora</strong></li>
+                  <li>Si <strong>NO solicitaste</strong> este cambio, ignora este mensaje y tu contraseña permanecerá sin cambios</li>
+                  <li>Por seguridad, nunca compartas este enlace con nadie</li>
+                  <li>Tu contraseña actual sigue siendo válida hasta que completes el proceso de restablecimiento</li>
+                </ul>
+              </div>
+              
+              <p style="margin-top: 30px; color: #666;">
+                Si tienes alguna pregunta o necesitas ayuda, contacta al administrador del sistema.
+              </p>
+            </div>
+            
+            <div class="footer">
+              <p><strong>Sistema de Seguridad UMG</strong></p>
+              <p>Maestría en Seguridad Informática</p>
+              <p>Universidad Mariano Gálvez de Guatemala</p>
+              <p style="margin-top: 15px; font-size: 12px; color: #999;">
+                Este es un mensaje automático, por favor no respondas a este correo.
+              </p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `
+    };
+
+    await sgMail.send(msg);
+    console.log(`📧 Email de recuperación enviado a: ${user.email}`);
+
+    // OPCIONAL: Notificación a admin (sin enviar el link por seguridad)
+    await alerts.custom('Solicitud de Reset Password', {
+      email: user.email,
+      nombre: user.nombre,
+      action: `Usuario solicitó restablecer su contraseña`,
+      severity: 'INFO',
+      instructions: 'Esta es solo una notificación administrativa. El enlace de reset fue enviado al usuario.'
+    });
+
+    res.json({ 
+      message: 'Si el email existe, recibirás instrucciones para restablecer tu contraseña.' 
+    });
+
+  } catch (error) {
+    console.error('❌ Error en forgot password:', error);
+    res.status(500).json({ error: 'Error al procesar solicitud' });
+  }
+});
+// VERIFICAR TOKEN
+router.get('/password/verify/:token', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const result = await db.query(
+      'SELECT id, email FROM usuarios WHERE reset_password_token = $1 AND reset_password_expires > NOW()',
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ 
+        error: 'Token inválido o expirado',
+        expired: true 
+      });
+    }
+
+    res.json({ 
+      valid: true,
+      email: result.rows[0].email 
+    });
+
+  } catch (error) {
+    console.error('Error verificando token:', error);
+    res.status(500).json({ error: 'Error al verificar token' });
+  }
+});
+
+// RESTABLECER CONTRASEÑA
+router.post('/password/reset', async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: 'Token y contraseña requeridos' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 8 caracteres' });
+    }
+
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(newPassword)) {
+      return res.status(400).json({ 
+        error: 'La contraseña debe contener mayúsculas, minúsculas y números' 
+      });
+    }
+
+    const result = await db.query(
+      'SELECT id, email FROM usuarios WHERE reset_password_token = $1 AND reset_password_expires > NOW()',
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ 
+        error: 'Token inválido o expirado' 
+      });
+    }
+
+    const user = result.rows[0];
+
+    const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+    await db.query(
+      'UPDATE usuarios SET password_hash = $1, reset_password_token = NULL, reset_password_expires = NULL WHERE id = $2',
+      [hashedPassword, user.id]
+    );
+
+    console.log(`✅ Contraseña restablecida para: ${user.email}`);
+
+    await alerts.custom('Contraseña Restablecida', {
+      email: user.email,
+      action: 'La contraseña de la cuenta fue cambiada exitosamente',
+      severity: 'INFO'
+    });
+
+    res.json({ 
+      message: 'Contraseña restablecida exitosamente. Ya puedes iniciar sesión.' 
+    });
+
+  } catch (error) {
+    console.error('Error restableciendo contraseña:', error);
+    res.status(500).json({ error: 'Error al restablecer contraseña' });
   }
 });
 

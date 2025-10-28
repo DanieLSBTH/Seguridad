@@ -412,5 +412,8 @@ module.exports = {
       severity: 'INFO',
       timestamp: new Date().toISOString()
     });
-  }
+  },
+
+  custom: sendAlert 
+  
 };
